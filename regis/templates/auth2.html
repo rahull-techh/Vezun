@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="VEZUN — Sign in or create an account for your meeting workspace.">
+  <title>VEZUN — Authentication Portal</title>
+  <style>
+    :root {
+      --ink: #171817;
+      --muted: #747873;
+      --line: #e8e9e5;
+      --paper: #0c0f0c;
+      --white: #141813;
+      --green: #c8f169;
+      --green-dark: #8ebd35;
+      --green-glow: rgba(200, 241, 105, 0.4);
+      --dark-card: #141813;
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; width: 100%; }
+    body {
+      background: #0f120e; color: #e5e9e0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5; -webkit-font-smoothing: antialiased;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow-x: hidden; min-height: 100vh;
+    }
+
+    /* Ambient Particle Canvas */
+    #bg-canvas {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      pointer-events: none; z-index: 0; opacity: 0.65;
+    }
+
+    /* Spotlight Follower */
+    #cursor-follower {
+      position: fixed; width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(200, 241, 105, 0.18) 0%, rgba(200, 241, 105, 0) 70%);
+      border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%);
+      z-index: 1; transition: opacity 0.3s ease; opacity: 0;
+    }
+
+    .auth-wrapper {
+      width: min(1040px, calc(100% - 32px));
+      min-height: 640px;
+      margin: 40px auto;
+      position: relative; z-index: 10;
+      display: grid; grid-template-columns: 1fr 1.15fr;
+      background: rgba(23, 28, 22, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius);
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(20px);
+      overflow: hidden;
+      perspective: 1200px;
+      transform-style: preserve-3d;
+      transition: transform 0.15s ease-out;
+    }
+
+    /* Left Side Branding & Interactive Showcase */
+    .auth-banner {
+      background: linear-gradient(145deg, #182017, #0e120d);
+      padding: 48px 40px; display: flex; flex-direction: column;
+      justify-content: space-between; border-right: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative; overflow: hidden;
+    }
+    .auth-banner:before {
+      content: ""; position: absolute; top: -20%; left: -20%; width: 320px; height: 320px;
+      border-radius: 50%; background: radial-gradient(circle, rgba(200, 241, 105, 0.12), transparent 70%);
+      pointer-events: none;
+    }
+    .brand-logo { font-size: 28px; font-weight: 850; letter-spacing: -1.5px; color: white; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
+    .brand-logo span { color: var(--green); }
+    .brand-logo-icon { width: 34px; height: 34px; flex-shrink: 0; }
+
+    .banner-hero-content { margin: auto 0; }
+    .eyebrow-pill {
+      display: inline-flex; align-items: center; gap: 8px; background: rgba(200, 241, 105, 0.12);
+      border: 1px solid rgba(200, 241, 105, 0.25); color: var(--green); padding: 5px 12px;
+      border-radius: 99px; font-size: 10px; font-weight: 800; letter-spacing: 1px; margin-bottom: 20px;
+    }
+    .eyebrow-pill i { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+    
+    .banner-hero-content h2 { font-size: 32px; font-weight: 800; line-height: 1.15; letter-spacing: -1px; color: white; margin-bottom: 14px; }
+    .banner-hero-content p { color: #9bb093; font-size: 13px; line-height: 1.8; max-width: 360px; }
+
+    /* Animated Live Badge Card */
+    .interactive-badge-card {
+      background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px; padding: 16px; margin-top: 28px; display: flex; align-items: center; gap: 14px;
+      backdrop-filter: blur(10px); transition: transform 0.3s;
+    }
+    .interactive-badge-card:hover { transform: translateY(-4px); border-color: rgba(200, 241, 105, 0.3); }
+    .badge-icon { width: 38px; height: 38px; border-radius: 50%; background: var(--green); color: #121612; display: grid; place-items: center; font-size: 16px; font-weight: 900; }
+    .badge-text strong { display: block; font-size: 12px; color: white; }
+    .badge-text small { font-size: 10px; color: #8e9e87; }
+
+    .banner-footer { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #6a7765; }
+
+    /* Right Side Interactive Form Studio */
+    .auth-form-container {
+      padding: 48px 44px; display: flex; flex-direction: column; justify-content: center;
+      position: relative; background: #131712;
+    }
+
+    /* Tab Controller */
+    .tab-switcher {
+      display: inline-flex; background: #1b211a; border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 4px; border-radius: 99px; margin-bottom: 32px; align-self: flex-start;
+    }
+    .tab-btn {
+      padding: 9px 24px; border-radius: 99px; border: 0; background: transparent;
+      color: #8b9985; font-size: 13px; font-weight: 750; cursor: pointer; transition: all 0.3s ease;
+    }
+    .tab-btn.active { background: var(--green); color: #121612; box-shadow: 0 4px 15px var(--green-glow); }
+
+    /* Forms Stage Switcher */
+    .form-stage-wrapper { position: relative; min-height: 420px; }
+    .auth-form {
+      position: absolute; inset: 0; display: flex; flex-direction: column; gap: 16px;
+      opacity: 0; pointer-events: none; transform: translateX(20px); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .auth-form.active { opacity: 1; pointer-events: auto; transform: translateX(0); position: relative; }
+
+    .form-header h3 { font-size: 24px; font-weight: 800; color: white; letter-spacing: -0.5px; }
+    .form-header p { font-size: 12px; color: #8e9c89; margin-top: 4px; }
+
+    /* Inputs with Micro-interactions */
+    .input-group { display: flex; flex-direction: column; gap: 6px; position: relative; }
+    .input-group label { font-size: 11px; font-weight: 750; color: #a4b59f; letter-spacing: 0.5px; }
+    .input-field-wrap { position: relative; display: flex; align-items: center; }
+    .input-field-wrap input {
+      width: 100%; background: #1a2018; border: 1px solid #283325; border-radius: 12px;
+      padding: 13px 16px; font-size: 13px; color: white; outline: none; transition: all 0.25s ease;
+      font-family: inherit;
+    }
+    .input-field-wrap input:focus {
+      border-color: var(--green); background: #1e261c;
+      box-shadow: 0 0 0 3px rgba(200, 241, 105, 0.15);
+    }
+    .toggle-password {
+      position: absolute; right: 14px; background: transparent; border: 0;
+      color: #798a74; cursor: pointer; font-size: 14px; transition: color 0.2s;
+    }
+    .toggle-password:hover { color: var(--green); }
+
+    /* Live Password Strength Meter */
+    .strength-meter-wrap { margin-top: 2px; }
+    .strength-bars { display: flex; gap: 4px; height: 4px; margin-top: 6px; }
+    .strength-bar { flex: 1; height: 100%; background: #263324; border-radius: 2px; transition: background 0.3s; }
+    .strength-label { font-size: 9px; color: #7a8a75; margin-top: 4px; display: block; font-weight: 700; }
+
+    /* Submit Button */
+    .btn-submit {
+      margin-top: 10px; background: var(--green); color: #121612; border: 0;
+      border-radius: 99px; padding: 14px; font-size: 13px; font-weight: 800;
+      cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative; overflow: hidden;
+    }
+    .btn-submit:hover {
+      background: #d6fa8b; transform: translateY(-2px);
+      box-shadow: 0 10px 25px var(--green-glow);
+    }
+    .btn-submit:after {
+      content: ""; position: absolute; top: -30%; left: -80%; width: 45%; height: 160%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+      transform: skewX(-20deg); transition: left 0.65s ease;
+    }
+    .btn-submit:hover:after { left: 140%; }
+
+    /* Social Auth Divider */
+    .divider { display: flex; align-items: center; gap: 12px; margin: 12px 0 4px; color: #586554; font-size: 11px; }
+    .divider:before, .divider:after { content: ""; flex: 1; height: 1px; background: #242d22; }
+
+    .social-auth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .social-btn {
+      background: #1a2018; border: 1px solid #283325; border-radius: 12px; padding: 10px;
+      color: #d1dad0; font-size: 12px; font-weight: 750; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;
+    }
+    .social-btn:hover { background: #222b20; border-color: #384834; color: white; transform: translateY(-2px); }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 40px);
+      opacity: 0; pointer-events: none; background: #1a2219; color: white;
+      border: 1px solid #334430; border-radius: 99px; padding: 12px 24px; font-size: 13px;
+      font-weight: 700; z-index: 100; box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+      transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; align-items: center; gap: 10px;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast-icon { width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #121612; display: grid; place-items: center; font-size: 10px; font-weight: 900; }
+
+    /* Form Shake Error */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+    .shake { animation: shake 0.4s ease-in-out; }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(200, 241, 105, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(200, 241, 105, 0); } }
+
+    /* Responsive Breakpoints */
+    @media (max-width: 850px) {
+      .auth-wrapper { grid-template-columns: 1fr; min-height: auto; }
+      .auth-banner { display: none; }
+      .auth-form-container { padding: 36px 28px; }
+      #cursor-follower { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cursor Follower Ambient Glow -->
+  <div id="cursor-follower"></div>
+
+  <!-- Dynamic Background Canvas -->
+  <canvas id="bg-canvas"></canvas>
+
+  <div class="auth-wrapper" id="authWrapper">
+    <!-- Left Banner Column -->
+    <div class="auth-banner">
+      <a class="brand-logo" href="vezun_home_animated_room.html">
+        <svg class="brand-logo-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="15" width="80" height="75" rx="24" fill="#c8f169"/>
+          <rect x="26" y="5" width="14" height="26" rx="7" fill="#c8f169" stroke="#121612" stroke-width="6"/>
+          <rect x="60" y="5" width="14" height="26" rx="7" fill="#c8f169" stroke="#121612" stroke-width="6"/>
+          <path d="M28 50 L50 72 L72 50" stroke="#121612" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        VEZUN<span>.</span>
+      </a>
+
+      <div class="banner-hero-content">
+        <div class="eyebrow-pill"><i></i> ONE WORKSPACE FOR MEETINGS</div>
+        <h2>Empower your meetings with intelligent flow.</h2>
+        <p>Access structured agendas, real-time collaboration tools, automated action items, and clear meeting history in one place.</p>
+
+        <div class="interactive-badge-card">
+          <div class="badge-icon">✓</div>
+          <div class="badge-text">
+            <strong>Seamless Sync Enabled</strong>
+            <small>Connected with Google Workspace & Slack</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="banner-footer">
+        <span>© 2026 VEZUN Inc.</span>
+        <span>Privacy & Security Guarded 🔒</span>
+      </div>
+    </div>
+
+    <!-- Right Interactive Form Column -->
+    <div class="auth-form-container">
+      
+      <!-- Interactive Tab Switcher -->
+      <div class="tab-switcher">
+        <button class="tab-btn active" id="tabLogin" onclick="switchAuthTab('login')">Sign In</button>
+        <button class="tab-btn" id="tabRegister" onclick="switchAuthTab('register')">Create Account</button>
+      </div>
+
+      <div class="form-stage-wrapper">
+
+        <!-- LOGIN FORM -->
+        <form class="auth-form active" id="loginForm" onsubmit="handleAuthSubmit(event, 'login')">
+          <div class="form-header">
+            <h3>Welcome back</h3>
+            <p>Enter your credentials to access your workspace.</p>
+          </div>
+
+          <div class="input-group">
+            <label for="loginEmail">EMAIL OR USERNAME</label>
+            <div class="input-field-wrap">
+              <input id="loginEmail" type="text" placeholder="username or name@company.com" required />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label for="loginPassword">PASSWORD</label>
+              <a href="#" onclick="showToast('Password reset link sent to your email!')" style="font-size:10px; color:var(--green); text-decoration:none; font-weight:700;">Forgot?</a>
+            </div>
+            <div class="input-field-wrap">
+              <input id="loginPassword" type="password" placeholder="••••••••••••" required />
+              <button class="toggle-password" type="button" onclick="togglePassVisibility('loginPassword', this)">👁️</button>
+            </div>
+          </div>
+
+          <button class="btn-submit" type="submit">Sign In to Workspace ↗</button>
+
+          <div class="divider">or continue with</div>
+
+          <div class="social-auth-grid">
+            <button class="social-btn" type="button" onclick="handleSocialLogin('Google')">
+              <span>🌐</span> Google
+            </button>
+            <button class="social-btn" type="button" onclick="handleSocialLogin('GitHub')">
+              <span>🐙</span> GitHub
+            </button>
+          </div>
+        </form>
+
+        <!-- REGISTER FORM -->
+        <form class="auth-form" id="registerForm" onsubmit="handleAuthSubmit(event, 'register')">
+          <div class="form-header">
+            <h3>Create your workspace</h3>
+            <p>Start organizing your meetings with VEZUN today.</p>
+          </div>
+
+          <div class="input-group">
+            <label for="regName">FULL NAME</label>
+            <div class="input-field-wrap">
+              <input id="regName" type="text" placeholder="Alex Morgan" required />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="regUsername">USERNAME</label>
+            <div class="input-field-wrap">
+              <input id="regUsername" type="text" placeholder="alexmorgan" required />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="regEmail">WORK EMAIL</label>
+            <div class="input-field-wrap">
+              <input id="regEmail" type="email" placeholder="alex@company.com" required />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="regPassword">CREATE PASSWORD</label>
+            <div class="input-field-wrap">
+              <input id="regPassword" type="password" placeholder="Minimum 8 characters" oninput="checkStrength(this.value)" required />
+              <button class="toggle-password" type="button" onclick="togglePassVisibility('regPassword', this)">👁️</button>
+            </div>
+
+            <!-- Live Password Strength Visualizer -->
+            <div class="strength-meter-wrap">
+              <div class="strength-bars">
+                <div class="strength-bar" id="bar1"></div>
+                <div class="strength-bar" id="bar2"></div>
+                <div class="strength-bar" id="bar3"></div>
+                <div class="strength-bar" id="bar4"></div>
+              </div>
+              <small class="strength-label" id="strengthLabel">Enter a secure password</small>
+            </div>
+          </div>
+
+          <button class="btn-submit" type="submit">Create Free Account ↗</button>
+
+          <div class="divider">or sign up with</div>
+
+          <div class="social-auth-grid">
+            <button class="social-btn" type="button" onclick="handleSocialLogin('Google')">
+              <span>🌐</span> Google
+            </button>
+            <button class="social-btn" type="button" onclick="handleSocialLogin('GitHub')">
+              <span>🐙</span> GitHub
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Toast Feedback -->
+  <div class="toast" id="toast">
+    <div class="toast-icon">✓</div>
+    <span id="toastMsg">Authentication Successful!</span>
+  </div>
+
+  <script>
+    /* 1. CURSOR SPOTLIGHT & CANVAS BACKGROUND PARTICLES */
+    const follower = document.getElementById('cursor-follower');
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 1;
+        this.vx = (Math.random() - 0.5) * 0.4;
+        this.vy = (Math.random() - 0.5) * 0.4;
+        this.alpha = Math.random() * 0.4 + 0.1;
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+      }
+      draw() {
+        ctx.fillStyle = `rgba(200, 241, 105, ${this.alpha})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    for (let i = 0; i < 40; i++) particles.push(new Particle());
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => { p.update(); p.draw(); });
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    /* 2. 3D CARD TILT ON MOUSEMOVE */
+    const authWrapper = document.getElementById('authWrapper');
+    document.addEventListener('mousemove', (e) => {
+      if (follower) {
+        follower.style.opacity = '1';
+        follower.style.left = `${e.clientX}px`;
+        follower.style.top = `${e.clientY}px`;
+      }
+
+      if (authWrapper && window.innerWidth > 850) {
+        const rect = authWrapper.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const tiltX = (e.clientY - centerY) / 45;
+        const tiltY = (centerX - e.clientX) / 45;
+        authWrapper.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+      }
+    });
+
+    document.addEventListener('mouseleave', () => {
+      if (follower) follower.style.opacity = '0';
+      if (authWrapper) authWrapper.style.transform = `rotateX(0deg) rotateY(0deg)`;
+    });
+
+    /* 3. INTERACTIVE TAB SWITCHING */
+    function switchAuthTab(mode) {
+      const loginTab = document.getElementById('tabLogin');
+      const regTab = document.getElementById('tabRegister');
+      const loginForm = document.getElementById('loginForm');
+      const regForm = document.getElementById('registerForm');
+
+      if (mode === 'login') {
+        loginTab.classList.add('active');
+        regTab.classList.remove('active');
+        regForm.classList.remove('active');
+        setTimeout(() => loginForm.classList.add('active'), 150);
+      } else {
+        regTab.classList.add('active');
+        loginTab.classList.remove('active');
+        loginForm.classList.remove('active');
+        setTimeout(() => regForm.classList.add('active'), 150);
+      }
+    }
+
+    /* 4. TOGGLE PASSWORD VISIBILITY */
+    function togglePassVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🔒';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
+    }
+
+    /* 5. LIVE PASSWORD STRENGTH METER */
+    function checkStrength(val) {
+      const bars = [document.getElementById('bar1'), document.getElementById('bar2'), document.getElementById('bar3'), document.getElementById('bar4')];
+      const label = document.getElementById('strengthLabel');
+      
+      let score = 0;
+      if (val.length >= 8) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+
+      bars.forEach((bar, idx) => {
+        if (idx < score) {
+          if (score === 1) bar.style.background = '#e74c3c';
+          else if (score === 2) bar.style.background = '#f39c12';
+          else if (score === 3) bar.style.background = '#f1c40f';
+          else bar.style.background = '#c8f169';
+        } else {
+          bar.style.background = '#263324';
+        }
+      });
+
+      const messages = ['Enter a secure password', 'Weak password', 'Fair password', 'Good password', 'Strong password ⚡'];
+      label.textContent = messages[score];
+      label.style.color = score === 4 ? '#c8f169' : '#7a8a75';
+    }
+
+    /* 6. TOAST FEEDBACK & FORM HANDLERS */
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    function handleAuthSubmit(e, mode) {
+      e.preventDefault();
+      showToast(mode === 'login' ? 'Authenticating... Welcome back!' : 'Account created successfully! Redirecting to Workspace...');
+      
+      // Line 310: Redirect back to landing page after authentication
+      setTimeout(() => {
+        window.location.href = 'vezun_home_animated_room.html';
+      }, 1400);
+    }
+
+    function handleSocialLogin(provider) {
+      showToast(`Connecting with ${provider}... Redirecting...`);
+      // Line 320: Redirect back to landing page after social login
+      setTimeout(() => {
+        window.location.href = 'vezun_home_animated_room.html';
+      }, 1400);
+    }
+  </script>
+</body>
+</html>
